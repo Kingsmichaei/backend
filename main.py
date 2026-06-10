@@ -167,12 +167,22 @@ def login(user: UserAuth, response: Response, db: Session = Depends(get_db)):
      }
 
 @app.post("/api/save-assessment")
-def save_assessment(data: AssessmentData, response: Response, db: Session = Depends(get_db)):
-    db_user = db.query(models.User).filter(models.User.email == data.email.lower()).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    
+def save_assessment(data: AssessmentSubmission, request: Request, db: Session = Depends(get_db)):
+    token = request.cookies.get("pathfinder_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="No active session")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_email = payload.get("sub")
+        db_user = db.query(models.User).filter(models.User.email == user_email).first()
 
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found.")
+    
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=404, detail="Invalid token")
+    
+    
     # Convert dictionaries to strings before saving them to SQLite
     db_user.profile_data = json.dumps(data.profileData)
     db_user.answers = json.dumps(data.answers)
