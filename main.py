@@ -84,6 +84,11 @@ class ProgressUpdate(BaseModel):
     completed_tasks: List[int] = []
     score: int = 0
 
+class AssessmentSubmission(BaseModel):
+    answers: dict
+    profileData: dict
+
+
 @app.post("/api/signup")
 def signup(user: UserAuth, response: Response, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.email == user.email.lower()).first()
@@ -195,9 +200,6 @@ def save_assessment(data: AssessmentSubmission, request: Request, db: Session = 
     return {"message": "Assessment saved successfully!"}
 
 
-class AssessmentSubmission(BaseModel):
-    answers: dict
-    profileData: dict
 
 @app.post("/api/analyze-assessment")
 def analyze_assessment(data: AssessmentSubmission, request: Request, db: Session = Depends(get_db)):
