@@ -107,7 +107,7 @@ def signup(user: UserAuth, response: Response, db: Session = Depends(get_db)):
         value=token,
         max_age=604800,  # 7 days in seconds
         httponly=True,
-        samesite="lax",
+        samesite="none",
         secure=True,  # Set to True in production with HTTPS
         path="/"
     )
@@ -141,7 +141,7 @@ def login(user: UserAuth, response: Response, db: Session = Depends(get_db)):
         value=token,
         httponly=True,
         max_age=604800,  # 7 days in seconds
-        samesite="lax",
+        samesite="none",
         secure=True,  # Set to True in production with HTTPS
         path="/"
     )
@@ -260,7 +260,7 @@ def google_auth(data: GoogleAuthData, response: Response, db: Session = Depends(
             value=token,
             max_age=604800,  # 7 days in seconds
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=True,  # Set to True in production with HTTPS
             path="/"
         )
@@ -295,7 +295,7 @@ def google_auth(data: GoogleAuthData, response: Response, db: Session = Depends(
             value=token,
             max_age=604800,  # 7 days in seconds
             httponly=True,
-            samesite="lax",
+            samesite="none",
             secure=True,  # Set to True in production with HTTPS
             path="/"
         )
