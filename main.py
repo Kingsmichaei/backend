@@ -29,6 +29,13 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 client = genai.Client()
 ALGORITHM = "HS256"
 
+
+def get_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        return auth_header.split(" ")[1]
+    return None
+
 def create_token(email: str):
     payload = {
         "sub": email,
@@ -107,17 +114,9 @@ def signup(user: UserAuth, response: Response, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     token = create_token(new_user.email)
-    response.set_cookie(
-        key="pathfinder_token",
-        value=token,
-        max_age=604800,  # 7 days in seconds
-        httponly=True,
-        samesite="none",
-        secure=True,  # Set to True in production with HTTPS
-        path="/"
-    )
     return {
         "message": "User created successfully",
+        "token": token,
         "user": {
             "email": new_user.email,
             "name": new_user.name,
@@ -141,15 +140,7 @@ def login(user: UserAuth, response: Response, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid email or password.")
 
     token = create_token(db_user.email)
-    response.set_cookie(
-        key="pathfinder_token",
-        value=token,
-        httponly=True,
-        max_age=604800,  # 7 days in seconds
-        samesite="none",
-        secure=True,  # Set to True in production with HTTPS
-        path="/"
-    )
+    
     first_name = db_user.name.split(' ')[0] if db_user.name else "Student"
     # Safely convert the text strings back into dictionaries for React
     profile_data_dict = json.loads(db_user.profile_data) if db_user.profile_data else None
@@ -160,6 +151,7 @@ def login(user: UserAuth, response: Response, db: Session = Depends(get_db)):
 
     return {
         "message": f"Welcome back, {first_name}!",
+        "token": token,
         "user": { 
             "email": db_user.email, 
             "name": db_user.name, 
@@ -173,7 +165,7 @@ def login(user: UserAuth, response: Response, db: Session = Depends(get_db)):
 
 @app.post("/api/save-assessment")
 def save_assessment(data: AssessmentSubmission, request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
     try:
@@ -197,14 +189,14 @@ def save_assessment(data: AssessmentSubmission, request: Request, db: Session = 
     db.commit()
     db.refresh(db_user)
 
-    return {"message": "Assessment saved successfully!"}
+    return {"message": "Assessment saved successfully!", "token": token}
 
 
 
 @app.post("/api/analyze-assessment")
 def analyze_assessment(data: AssessmentSubmission, request: Request, db: Session = Depends(get_db)):
     # Verify the user is logged in securely
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
     try:
@@ -266,19 +258,12 @@ def google_auth(data: GoogleAuthData, response: Response, db: Session = Depends(
         parsed_analysis = None
         if db_user.ai_analysis:
             parsed_analysis = json.loads(db_user.ai_analysis)
-        token = create_token(db_user.email)
-        response.set_cookie(
-            key="pathfinder_token",
-            value=token,
-            max_age=604800,  # 7 days in seconds
-            httponly=True,
-            samesite="none",
-            secure=True,  # Set to True in production with HTTPS
-            path="/"
-        )
 
+        token = create_token(db_user.email)
+        
         return {
             "message": f"Welcome back, {first_name}!",
+            "token": token,
             "user": {
                 "email": db_user.email,
                 "name": db_user.name,
@@ -302,18 +287,10 @@ def google_auth(data: GoogleAuthData, response: Response, db: Session = Depends(
         db.refresh(new_user)
         
         token = create_token(new_user.email)
-        response.set_cookie(
-            key="pathfinder_token",
-            value=token,
-            max_age=604800,  # 7 days in seconds
-            httponly=True,
-            samesite="none",
-            secure=True,  # Set to True in production with HTTPS
-            path="/"
-        )
         
         return {
             "message": "Account created via Google",
+            "token": token,
             "user": {
                 "email": new_user.email,
                 "name": new_user.name,
@@ -327,7 +304,7 @@ def google_auth(data: GoogleAuthData, response: Response, db: Session = Depends(
 
 @app.get("/api/me")
 def get_current_user(request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
@@ -353,6 +330,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         parsed_analysis = json.loads(db_user.ai_analysis)
     return {
         "message": f"Welcome back, {first_name}!",
+        "token": token,
             "user": {
                 "email": db_user.email,
                 "name": db_user.name,
@@ -366,7 +344,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/api/progress")
 def save_progress(data: ProgressUpdate, request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
     
@@ -403,7 +381,7 @@ def save_progress(data: ProgressUpdate, request: Request, db: Session = Depends(
 
 @app.get("/api/progress")
 def get_progress(request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
     
@@ -437,7 +415,7 @@ def generate_career_path(request: Request, db: Session = Depends(get_db)):
     """
     
     # 1. Authenticate using the JWT cookie (Zero-trust security)
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
 
@@ -512,13 +490,12 @@ def generate_career_path(request: Request, db: Session = Depends(get_db)):
 
 
 @app.post("/api/logout")
-def logout(response: Response):
-    response.delete_cookie(key="pathfinder_token", path="/")
+def logout():
     return {"message": "Logged out successfully"}
 
 @app.delete("/api/delete-account")
 def delete_account(request: Request, response: Response, db: Session = Depends(get_db)):
-    token = request.cookies.get("pathfinder_token")
+    token = get_token(request)
     if not token:
         raise HTTPException(status_code=401, detail="No active session")
     
@@ -532,7 +509,6 @@ def delete_account(request: Request, response: Response, db: Session = Depends(g
         db.delete(db_user)
         db.commit()
         
-        response.delete_cookie(key="pathfinder_token", path="/")
         return {"message": "Account deleted successfully"}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired")
