@@ -56,7 +56,7 @@ app = FastAPI()
 # Configure CORS to allow your React app to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://pathfinder-amber-eta.vercel.app"],
+    allow_origins=["http://localhost:5173", "https://pathfinder-amber-eta.vercel.app", "https://pathfinder-omkcode.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
